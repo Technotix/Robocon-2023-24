@@ -15,7 +15,7 @@
 
 # ABU Robocon 2024
 
-The ABU Asia-Pacific Robot Contest (ABU Robocon) is an Asian-Oceanian college robot competition.
+The ABU Asia-Pacific Robot Contest [(ABU Robocon)](https://aburobocon2024.vtv.gov.vn/) is an Asian-Oceanian college robot competition.
 
 ## License
 
