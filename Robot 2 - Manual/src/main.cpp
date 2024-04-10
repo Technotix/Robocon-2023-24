@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #define XBOX_ALT_MODE
 
 #include <Cytron_SmartDriveDuo.h>
@@ -17,12 +19,19 @@
 
 #define minSpeed 10
 #define maxSpeed 50
+#define rMaxSpeed 150
 
 #define mdds_1_2 39
 #define mdds_3_4 41
 
 Cytron_SmartDriveDuo motor1motor2(SERIAL_SIMPLIFIED, mdds_1_2, 115200);
 Cytron_SmartDriveDuo motor3motor4(SERIAL_SIMPLIFIED, mdds_3_4, 115200);
+
+CytronMD roller_1(PWM_DIR, 6, 43);   
+CytronMD roller_2(PWM_DIR, 3, 49);   
+CytronMD roller_3(PWM_DIR, 4, 47);   
+CytronMD roller_in(PWM_DIR, 5, 45);  
+
 
 USB Usb;
 #ifdef XBOX_ALT_MODE
@@ -47,8 +56,7 @@ bool xboxConnCheck() {
 #endif
 }
 
-int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0;
-bool intake, shooting, rejecting, invert_intake;
+int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, prev_id = 0, prev_sd = 0;
 
 void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
 
@@ -61,10 +69,31 @@ void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
   motor3motor4.control(right_wheel, left_wheel);
 }
 
-CytronMD roller_3(PWM_DIR, 4, 47);   // roller_in on mdd20a
-CytronMD roller_in(PWM_DIR, 5, 45);  // roller_3 on mdd20a
-CytronMD roller_2(PWM_DIR, 3, 49);   // roller_2 on md20a
-CytronMD roller_1(PWM_DIR, 6, 43);   // roller_1 on md20a
+void updateIntake(int dir) {
+  if (dir == 1 & prev_id != 1) {
+    roller_in.setSpeed(rMaxSpeed);
+  } else if (dir == -1 & prev_id != -1) {
+    roller_in.setSpeed(-rMaxSpeed);
+  } else {
+    roller_in.setSpeed(0);
+  }
+}
+
+void updateShooting(int dir) {
+  if (dir == 1 & prev_sd != 1) {
+    roller_1.setSpeed(-rMaxSpeed);
+    roller_2.setSpeed(-rMaxSpeed);
+    roller_3.setSpeed(rMaxSpeed);
+  } else if (dir == -1 & prev_sd != -1) {
+    roller_1.setSpeed(rMaxSpeed);
+    roller_2.setSpeed(-rMaxSpeed);
+    roller_3.setSpeed(rMaxSpeed);
+  } else {
+    roller_1.setSpeed(0);
+    roller_2.setSpeed(0);
+    roller_3.setSpeed(0);
+  }
+}
 
 void setup() {
   Wire.begin();
@@ -79,6 +108,8 @@ void setup() {
       ;
   }
   Serial.print(F("\r\nXbox Wireless Receiver Library Started"));
+  updateIntake(0);
+  updateShooting(0);
   updateMotors(0, 0, 0);
 }
 
@@ -95,7 +126,7 @@ void loop() {
     int rightHatX = Xbox.getAnalogHat(RightHatX, conid);
 #endif
 
-    int XSpeed = 0, YSpeed = 0, TSpeed = 0;
+    int XSpeed = 0, YSpeed = 0, TSpeed = 0, intDir = 0, shootDir = 0;
 
 
     if (leftHatX > deadzone) {
@@ -114,53 +145,24 @@ void loop() {
       TSpeed = map(rightHatX, -32768, deadzone, -maxSpeed, minSpeed);
     }
 
+    if (Xbox.getButtonPress(LB)) {
+      intDir = 1;
+    } else if (Xbox.getButtonPress(LT)) {
+      intDir = -1;
+    }
+    
+    if (Xbox.getButtonPress(RB)) {
+      shootDir = 1;
+    } else if (Xbox.getButtonPress(RT)) {
+      shootDir = -1;
+    }
+
+    updateIntake(intDir);
+    updateShooting(shootDir);
     updateMotors(XSpeed, YSpeed, TSpeed * 0.8);
-    if (Xbox.getButtonClick(LB)) {
-      intake = !intake;
-      invert_intake = false;
-    }
-    if (Xbox.getButtonClick(LT)) {
-      invert_intake = !invert_intake;
-      intake = false;
-    }
-    if (Xbox.getButtonClick(RB)) {
-      shooting = !shooting;
-      rejecting = false;
-    }
-    if (Xbox.getButtonClick(RT)) {
-      shooting = false;
-      rejecting = !rejecting;
-    }
-
-    if (intake) {
-      roller_in.setSpeed(255);
-    } else if (invert_intake) {
-      roller_in.setSpeed(-255);
-    } else {
-      roller_in.setSpeed(0);
-    }
-
-    if (shooting) {
-      roller_1.setSpeed(-255);
-      roller_2.setSpeed(-255);
-      roller_3.setSpeed(255);
-    } else if (rejecting) {
-      roller_1.setSpeed(255);
-      roller_2.setSpeed(-255);
-      roller_3.setSpeed(255);
-    } else {
-      roller_1.setSpeed(0);
-      roller_2.setSpeed(0);
-      roller_3.setSpeed(0);
-    }
-    Serial.print(intake);
-    Serial.print(shooting);
-    Serial.println(rejecting);
   } else {
-    roller_in.setSpeed(0);
-    roller_1.setSpeed(0);
-    roller_2.setSpeed(0);
-    roller_3.setSpeed(0);
+    updateIntake(0);
+    updateShooting(0);
     updateMotors(0, 0, 0);
   }
 }
