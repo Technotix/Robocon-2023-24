@@ -19,18 +19,18 @@
 
 #define minSpeed 10
 #define maxSpeed 50
-#define rMaxSpeed 150
+#define rMaxSpeed 200
 
-#define mdds_1_2 39
-#define mdds_3_4 41
+#define mdds_1_2 47
+#define mdds_3_4 49
 
 Cytron_SmartDriveDuo motor1motor2(SERIAL_SIMPLIFIED, mdds_1_2, 115200);
 Cytron_SmartDriveDuo motor3motor4(SERIAL_SIMPLIFIED, mdds_3_4, 115200);
 
-CytronMD roller_1(PWM_DIR, 6, 43);   
-CytronMD roller_2(PWM_DIR, 3, 49);   
-CytronMD roller_3(PWM_DIR, 4, 47);   
-CytronMD roller_in(PWM_DIR, 5, 45);  
+CytronMD roller_in(PWM_DIR, 2, 37);  
+CytronMD roller_1(PWM_DIR, 3, 33);   
+CytronMD roller_3(PWM_DIR, 4, 45);   
+CytronMD roller_2(PWM_DIR, 5, 35);   
 
 
 USB Usb;
@@ -65,8 +65,8 @@ void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
   back_wheel = constrain(-XSpeed - TSpeed, -100, 100);
   left_wheel = constrain(YSpeed - TSpeed, -100, 100);
 
-  motor1motor2.control(front_wheel, back_wheel);
-  motor3motor4.control(right_wheel, left_wheel);
+  motor1motor2.control(front_wheel, right_wheel);
+  motor3motor4.control(back_wheel, -left_wheel);
 }
 
 void updateIntake(int dir) {
@@ -81,9 +81,9 @@ void updateIntake(int dir) {
 
 void updateShooting(int dir) {
   if (dir == 1 & prev_sd != 1) {
-    roller_1.setSpeed(-rMaxSpeed);
-    roller_2.setSpeed(-rMaxSpeed);
-    roller_3.setSpeed(rMaxSpeed);
+    roller_1.setSpeed(rMaxSpeed);
+    roller_2.setSpeed(rMaxSpeed);
+    roller_3.setSpeed(-rMaxSpeed);
   } else if (dir == -1 & prev_sd != -1) {
     roller_1.setSpeed(rMaxSpeed);
     roller_2.setSpeed(-rMaxSpeed);
@@ -160,6 +160,8 @@ void loop() {
     updateIntake(intDir);
     updateShooting(shootDir);
     updateMotors(XSpeed, YSpeed, TSpeed * 0.8);
+
+    // Print
   } else {
     updateIntake(0);
     updateShooting(0);
