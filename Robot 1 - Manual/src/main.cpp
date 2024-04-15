@@ -22,21 +22,23 @@
 #define conid 0
 #define deadzone 0
 #define minSpeed 10
-#define maxSpeed 50
+#define maxSpeed 75
 
 // Define Motor Pins
-#define mdds_1_2 50
-#define mdds_3_4 51
+#define mdds_1_2 38
+#define mdds_3_4 39
 
 // Define Servo Pins
-#define srvPin1_3 12
+#define srvPin1 12
 #define srvPin2 13
-#define srvPin4_6 10
-#define srvPin5 11
+#define srvPin3 12
+#define srvPin4 5
+#define srvPin5 6
+#define srvPin6 7
 
-// Define Pneumatic Pins
-#define leftPneumatic 53
-#define rightPneumatic 52
+#define leftPneumatic 48
+#define rightPneumatic 49
+
 
 // Define Stepper Pins
 #define pul 30
@@ -47,7 +49,7 @@
 HardwareSerial& odrive_serial = Serial1;
 ODriveArduino odrive(odrive_serial);
 
-Servo servo1_3, servo2, servo4_6, servo5;
+Servo servo1, servo2, servo3, servo4, servo5, servo6;
 
 Cytron_SmartDriveDuo motor1motor2(SERIAL_SIMPLIFIED, mdds_1_2, 115200);
 Cytron_SmartDriveDuo motor3motor4(SERIAL_SIMPLIFIED, mdds_3_4, 115200);
@@ -92,7 +94,7 @@ void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
 }
 
 void setServo(Servo servo, bool angle) {
-  servo.write(angle? 0 : 90);
+  servo.write(angle? 0 : 180);
 }
 
 void stepperUpdate(int cycles, int direction, int speed) {
@@ -124,10 +126,12 @@ void setup() {
   Serial.print(F("\r\nXbox Wireless Receiver Library Started"));
 
   // Attach Servos
-  servo1_3.attach(srvPin1_3, 1000, 2500);
+  servo1.attach(srvPin1, 1000, 2500);
   servo2.attach(srvPin2, 1000, 2500);
-  servo4_6.attach(srvPin4_6, 1000, 2500);
+  servo3.attach(srvPin3, 1000, 2500);
+  servo4.attach(srvPin4, 1000, 2500);
   servo5.attach(srvPin5, 1000, 2500);
+  servo6.attach(srvPin6, 1000, 2500);
 
   // Set Pneumatic Pins
   pinMode(leftPneumatic, OUTPUT);
@@ -139,10 +143,12 @@ void setup() {
 
   // Set Initial Values
   updateMotors(0, 0, 0);
-  setServo(servo1_3, 0);
+  setServo(servo1, 0);
   setServo(servo2, 0);
-  setServo(servo4_6, 0);
+  setServo(servo3, 0);
+  setServo(servo4, 0);
   setServo(servo5, 0);
+  setServo(servo6, 0);
   digitalWrite(leftPneumatic, LOW);
   digitalWrite(rightPneumatic, LOW);
 }
@@ -183,24 +189,28 @@ void loop() {
 
     // Servo Control
     if (Xbox.getButtonClick(LB)) {
-      setServo(servo1_3, 1);
+      setServo(servo1, 1);
+      setServo(servo3, 0);
     }
     if (Xbox.getButtonClick(LT)) {
-      setServo(servo2, 1);
-    }
-    if (Xbox.getButtonClick(RB)) {
-      setServo(servo4_6, 1);
-    }
-    if (Xbox.getButtonClick(RT)) {
-      setServo(servo5, 1);
-    }
-    if (Xbox.getButtonClick(B)) {
-      setServo(servo1_3, 0);
       setServo(servo2, 0);
     }
-    if (Xbox.getButtonClick(X)) {
-      setServo(servo4_6, 0);
+    if (Xbox.getButtonClick(RB)) {
+      setServo(servo4, 1);
+      setServo(servo6, 0);
+    }
+    if (Xbox.getButtonClick(RT)) {
       setServo(servo5, 0);
+    }
+    if (Xbox.getButtonClick(B)) {
+      setServo(servo1, 0);
+      setServo(servo2, 1);
+      setServo(servo3, 1);
+    }
+    if (Xbox.getButtonClick(X)) {
+      setServo(servo4, 0);
+      setServo(servo5, 1);
+      setServo(servo6, 1);
     }
 
     // Pneumatic Control
@@ -237,35 +247,39 @@ void loop() {
     }
 
     // Motor Debugging
-    Serial.print("Motor 1: ");
+    Serial.print("Motors - 1: ");
     Serial.print(front_wheel);
-    Serial.print("  Motor 2: ");
+    Serial.print("  2: ");
     Serial.print(right_wheel);
-    Serial.print("  Motor 3: ");
+    Serial.print("  3: ");
     Serial.print(back_wheel);
-    Serial.print("  Motor 4: ");
+    Serial.print("  4: ");
     Serial.print(left_wheel);
 
     // Servo Debugging
-    Serial.print("  Servo 1-3: ");
-    Serial.print(servo1_3.read());
-    Serial.print("  Servo 2: ");
+    Serial.print("  Servos - 1: ");
+    Serial.print(servo1.read());
+    Serial.print("  2: ");
     Serial.print(servo2.read());
-    Serial.print("  Servo 4-6: ");
-    Serial.print(servo4_6.read());
-    Serial.print("  Servo 5: ");
+    Serial.print("  3: ");
+    Serial.print(servo3.read());
+    Serial.print("  4: ");
+    Serial.print(servo4.read());
+    Serial.print("  5: ");
     Serial.print(servo5.read());
+    Serial.print("  6: ");
+    Serial.print(servo6.read());
 
     // Pneumatic Debugging
-    Serial.print("  Pneumatic Left: ");
+    Serial.print("  Pneumatics - Left: ");
     Serial.print(pneumLeft);
-    Serial.print("  Pneumatic Right: ");
+    Serial.print("  Right: ");
     Serial.print(pneumRight);
 
     // ODrive Debugging
-    Serial.print("  ODrive 0: ");
+    Serial.print("  ODrives - 0: ");
     Serial.print(odrv0);
-    Serial.print("  ODrive 1: ");
+    Serial.print("  1: ");
     Serial.println(odrv1);
   } else {
     updateMotors(0, 0, 0);
