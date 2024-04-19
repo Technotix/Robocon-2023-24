@@ -29,12 +29,11 @@
 #define mdds_3_4 39
 
 // Define Servo Pins
-#define srvPin1 12
-#define srvPin2 13
-#define srvPin3 12
-#define srvPin4 5
-#define srvPin5 6
-#define srvPin6 7
+#define srvPin1_3 7
+#define srvPin2 6
+#define srvPin4 4
+#define srvPin5 3
+#define srvPin6 5
 
 #define leftPneumatic 48
 #define rightPneumatic 49
@@ -49,7 +48,7 @@
 HardwareSerial& odrive_serial = Serial1;
 ODriveArduino odrive(odrive_serial);
 
-Servo servo1, servo2, servo3, servo4, servo5, servo6;
+Servo servo1_3, servo2, servo4, servo5, servo6;
 
 Cytron_SmartDriveDuo motor1motor2(SERIAL_SIMPLIFIED, mdds_1_2, 115200);
 Cytron_SmartDriveDuo motor3motor4(SERIAL_SIMPLIFIED, mdds_3_4, 115200);
@@ -62,7 +61,7 @@ XBOXRECV Xbox(&Usb);
 #endif
 
 
-int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, requested_state = 0, motornum = 0, pickupState = 0;
+int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, requested_state = 0, motornum = 0, pickupState = 0, srvState1_3 = 0, srvState2 = 0, srvState4_5 = 0, srvState6 = 0;
 bool pneumLeft = false, pneumRight = false, odrv = false;
 
 
@@ -94,7 +93,7 @@ void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
 }
 
 void setServo(Servo servo, bool angle) {
-  servo.write(angle? 0 : 180);
+  servo.write(angle? 180 : 45);
 }
 
 void setPickup(int direction, int speed) {
@@ -125,9 +124,8 @@ void setup() {
   Serial.print(F("\r\nXbox Wireless Receiver Library Started"));
 
   // Attach Servos
-  servo1.attach(srvPin1, 1000, 2500);
+  servo1_3.attach(srvPin1_3, 1000, 2500);
   servo2.attach(srvPin2, 1000, 2500);
-  servo3.attach(srvPin3, 1000, 2500);
   servo4.attach(srvPin4, 1000, 2500);
   servo5.attach(srvPin5, 1000, 2500);
   servo6.attach(srvPin6, 1000, 2500);
@@ -142,10 +140,9 @@ void setup() {
 
   // Set Initial Values
   updateMotors(0, 0, 0);
-  setServo(servo1, 0);
-  setServo(servo2, 0);
-  setServo(servo3, 0);
-  setServo(servo4, 0);
+  setServo(servo1_3, 0);
+  setServo(servo2, 1);
+  setServo(servo4, 1);
   setServo(servo5, 0);
   setServo(servo6, 0);
   digitalWrite(leftPneumatic, LOW);
@@ -187,37 +184,51 @@ void loop() {
     updateMotors(XSpeed, YSpeed, TSpeed * 0.8);
 
     // Servo Control
-    if (Xbox.getButtonClick(LB)) {
-      setServo(servo1, 1);
-      setServo(servo3, 0);
-    }
     if (Xbox.getButtonClick(LT)) {
-      setServo(servo2, 0);
+      if (srvState1_3 == 0) {
+        setServo(servo1_3, 1);
+        srvState1_3 = 1;
+      } else {
+        setServo(servo1_3, 0);
+        srvState1_3 = 0;
+      }
     }
-    if (Xbox.getButtonClick(RB)) {
-      setServo(servo4, 1);
-      setServo(servo6, 0);
+    if (Xbox.getButtonClick(LB)) {
+      if (srvState2 == 0) {
+        setServo(servo2, 0);
+        srvState2 = 1;
+      } else {
+        setServo(servo2, 1);
+        srvState2 = 0;
+      }
     }
     if (Xbox.getButtonClick(RT)) {
-      setServo(servo5, 0);
+      if (srvState4_5 == 0) {
+        setServo(servo4, 0);
+        setServo(servo5, 1);
+        srvState4_5 = 1;
+      } else {
+        setServo(servo4, 1);
+        setServo(servo5, 0);
+        srvState4_5 = 0;
+      }
     }
-    if (Xbox.getButtonClick(B)) {
-      setServo(servo1, 0);
-      setServo(servo2, 1);
-      setServo(servo3, 1);
-    }
-    if (Xbox.getButtonClick(X)) {
-      setServo(servo4, 0);
-      setServo(servo5, 1);
-      setServo(servo6, 1);
+    if (Xbox.getButtonClick(RB)) {
+      if (srvState6 == 0) {
+        setServo(servo6, 1);
+        srvState6 = 1;
+      } else {
+        setServo(servo6, 0);
+        srvState6 = 0;
+      }
     }
 
     // Pneumatic Control
-    if (Xbox.getButtonClick(LEFT)) {
+    if (Xbox.getButtonClick(BACK)) {
       digitalWrite(leftPneumatic, pneumLeft ? LOW : HIGH);
       pneumLeft = !pneumLeft;
     }
-    if (Xbox.getButtonClick(RIGHT)) {
+    if (Xbox.getButtonClick(START)) {
       digitalWrite(rightPneumatic, pneumRight ? LOW : HIGH);
       pneumRight = !pneumRight;
     }
@@ -279,12 +290,10 @@ void loop() {
     Serial.print(left_wheel);
 
     // Servo Debugging
-    Serial.print("  Servos - 1: ");
-    Serial.print(servo1.read());
+    Serial.print("  Servos - 1_3: ");
+    Serial.print(servo1_3.read());
     Serial.print("  2: ");
     Serial.print(servo2.read());
-    Serial.print("  3: ");
-    Serial.print(servo3.read());
     Serial.print("  4: ");
     Serial.print(servo4.read());
     Serial.print("  5: ");
