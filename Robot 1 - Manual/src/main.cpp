@@ -20,12 +20,12 @@
 
 // Define XBOX Controller Buttons and Speed Parameters
 #define conid 0
-#define deadzone 0
+#define deadzone 500
 #define minSpeed 10
 #define maxSpeed 75
 
 // Define Motor Pins
-#define mdds_1_2 38
+#define mdds_1_2 36
 #define mdds_3_4 39
 
 // Define Servo Pins
@@ -83,10 +83,10 @@ bool xboxConnCheck() {
 
 void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
 
-  front_wheel = constrain(YSpeed + TSpeed, -100, 100);
-  right_wheel = constrain(-XSpeed + TSpeed, -100, 100);
-  back_wheel = constrain(-YSpeed + TSpeed, -100, 100);
-  left_wheel = constrain(XSpeed + TSpeed, -100, 100);
+  front_wheel = constrain(-YSpeed + TSpeed, -100, 100);
+  right_wheel = constrain(XSpeed + TSpeed, -100, 100);
+  back_wheel = constrain(YSpeed + TSpeed, -100, 100);
+  left_wheel = constrain(-XSpeed + TSpeed, -100, 100);
 
   motor1motor2.control(front_wheel, right_wheel);
   motor3motor4.control(back_wheel, left_wheel);
@@ -257,19 +257,9 @@ void loop() {
     // Ball Pickup Control
     if (Xbox.getButtonClick(UP)) {
       if (pickupState == 0) {
-        if (odrv != 1) {
-          odrive.SetVelocity(0, 35);
-          odrive.SetVelocity(1, 30);
-          odrv = 1;
-        }
         setPickup(1, 250);
         pickupState = 1;
       } else {
-        if (odrv != 0) {
-          odrive.SetVelocity(0, 0);
-          odrive.SetVelocity(1, 0);
-          odrv = 0;
-        }
         setPickup(0, 255);
         delay(500); // TODO - Asynchronous
         setPickup(0, 0);

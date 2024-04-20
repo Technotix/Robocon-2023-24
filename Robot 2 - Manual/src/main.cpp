@@ -14,7 +14,7 @@
 #include <XBOXRECV.h>
 #endif
 
-#define deadzone 0
+#define deadzone 350
 #define conid 0
 
 #define minSpeed 10
@@ -60,19 +60,19 @@ int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, prev_id = 
 
 void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
 
-  front_wheel = constrain(XSpeed - TSpeed, -100, 100);
-  right_wheel = constrain(-YSpeed - TSpeed, -100, 100);
-  back_wheel = constrain(-XSpeed - TSpeed, -100, 100);
-  left_wheel = constrain(YSpeed - TSpeed, -100, 100);
+  front_wheel = constrain(YSpeed + TSpeed, -100, 100);
+  right_wheel = constrain(-XSpeed + TSpeed, -100, 100);
+  back_wheel = constrain(-YSpeed + TSpeed, -100, 100);
+  left_wheel = constrain(XSpeed + TSpeed, -100, 100);
 
   motor1motor2.control(front_wheel, right_wheel);
   motor3motor4.control(back_wheel, -left_wheel);
 }
 
 void updateIntake(int dir) {
-  if (dir == 1 & prev_id != 1) {
+  if ((dir == 1) && (prev_id != 1)) {
     roller_in.setSpeed(rMaxSpeed);
-  } else if (dir == -1 & prev_id != -1) {
+  } else if ((dir == -1) && (prev_id != -1)) {
     roller_in.setSpeed(-rMaxSpeed);
   } else {
     roller_in.setSpeed(0);
@@ -80,11 +80,11 @@ void updateIntake(int dir) {
 }
 
 void updateShooting(int dir) {
-  if (dir == 1 & prev_sd != 1) {
+  if ((dir == 1) && (prev_sd != 1)) {
     roller_1.setSpeed(rMaxSpeed);
     roller_2.setSpeed(rMaxSpeed);
     roller_3.setSpeed(-rMaxSpeed);
-  } else if (dir == -1 & prev_sd != -1) {
+  } else if ((dir == -1) && (prev_sd != -1)) {
     roller_1.setSpeed(rMaxSpeed);
     roller_2.setSpeed(-rMaxSpeed);
     roller_3.setSpeed(rMaxSpeed);
@@ -131,18 +131,18 @@ void loop() {
 
     if (leftHatX > deadzone) {
       XSpeed = map(leftHatX, deadzone, 32767, minSpeed, maxSpeed);
-    } else if (leftHatX < deadzone) {
-      XSpeed = map(leftHatX, -32768, deadzone, -maxSpeed, minSpeed);
+    } else if (leftHatX < -deadzone) {
+      XSpeed = map(leftHatX, -32768, -deadzone, -maxSpeed, minSpeed);
     }
     if (leftHatY > deadzone) {
       YSpeed = map(leftHatY, deadzone, 32767, minSpeed, maxSpeed);
-    } else if (leftHatY < deadzone) {
-      YSpeed = map(leftHatY, -32768, deadzone, -maxSpeed, minSpeed);
+    } else if (leftHatY < -deadzone) {
+      YSpeed = map(leftHatY, -32768, -deadzone, -maxSpeed, minSpeed);
     }
     if (rightHatX > deadzone) {
       TSpeed = map(rightHatX, deadzone, 32767, minSpeed, maxSpeed);
-    } else if (rightHatX < deadzone) {
-      TSpeed = map(rightHatX, -32768, deadzone, -maxSpeed, minSpeed);
+    } else if (rightHatX < -deadzone) {
+      TSpeed = map(rightHatX, -32768, -deadzone, -maxSpeed, minSpeed);
     }
 
     if (Xbox.getButtonPress(LB)) {
@@ -161,7 +161,17 @@ void loop() {
     updateShooting(shootDir);
     updateMotors(XSpeed, YSpeed, TSpeed * 0.8);
 
-    // Print
+    // Print Motors
+    Serial.print("Motor 1: ");
+    Serial.print(front_wheel);
+    Serial.print(" Motor 2: ");
+    Serial.print(right_wheel);
+    Serial.print(" Motor 3: ");
+    Serial.print(back_wheel);
+    Serial.print(" Motor 4: ");
+    Serial.println(left_wheel);
+
+
   } else {
     updateIntake(0);
     updateShooting(0);
