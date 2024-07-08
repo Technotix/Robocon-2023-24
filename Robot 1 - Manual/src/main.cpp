@@ -7,6 +7,7 @@
 #include <Servo.h>
 #include <HardwareSerial.h>
 #include <math.h>
+#include "CytronMotorDriver.h"
 #include <ODriveArduino.h>
 #include <SoftwareSerial.h>
 #include <SPI.h>
@@ -17,38 +18,26 @@
 #include <XBOXRECV.h>
 #endif
 
-
 // Define XBOX Controller Buttons and Speed Parameters
 #define conid 0
-#define deadzone 500
-#define minSpeed 10
-#define maxSpeed 75
+#define deadzone 0
 
 // Define Motor Pins
-#define mdds_1_2 36
-#define mdds_3_4 39
+#define mdds_1_2 23
+#define mdds_3_4 25
 
-// Define Servo Pins
-#define srvPin1_3 7
-#define srvPin2 6
-#define srvPin4 4
-#define srvPin5 3
-#define srvPin6 5
-
-#define leftPneumatic 48
-#define rightPneumatic 49
-
+CytronMD linearLeft(PWM_DIR, 5, 49);
+CytronMD linearRight(PWM_DIR, 4, 53);
 
 // Define Ball Pickup Pins
-#define pwm 8
-#define dir 9
-
+#define pwm 2
+#define dir 27
 
 // Define All Objects
-HardwareSerial& odrive_serial = Serial1;
+HardwareSerial &odrive_serial = Serial3;
 ODriveArduino odrive(odrive_serial);
 
-Servo servo1_3, servo2, servo4, servo5, servo6;
+HardwareSerial &servo_serial = Serial2;
 
 Cytron_SmartDriveDuo motor1motor2(SERIAL_SIMPLIFIED, mdds_1_2, 115200);
 Cytron_SmartDriveDuo motor3motor4(SERIAL_SIMPLIFIED, mdds_3_4, 115200);
@@ -60,20 +49,22 @@ XBOXUSB Xbox(&Usb);
 XBOXRECV Xbox(&Usb);
 #endif
 
+int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, requested_state = 0, motornum = 0, pickupState = 0, srvState1_2 = 1, srvState3_4 = 1, bp_state = 0, srv_1_2 = 0, srv_3_4 = 0;
+bool odrv = false, mode1 = true, mode2 = false;
 
-int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, requested_state = 0, motornum = 0, pickupState = 0, srvState1_3 = 0, srvState2 = 0, srvState4_5 = 0, srvState6 = 0;
-bool pneumLeft = false, pneumRight = false, odrv = false;
-
-
-bool xboxConnCheck() {
+bool xboxConnCheck()
+{
 #ifdef XBOX_ALT_MODE
-  if (Xbox.Xbox360Connected) {
+  if (Xbox.Xbox360Connected)
+  {
     return true;
   }
   return false;
 #else
-  if (Xbox.XboxReceiverConnected) {
-    if (Xbox.Xbox360Connected[conid]) {
+  if (Xbox.XboxReceiverConnected)
+  {
+    if (Xbox.Xbox360Connected[conid])
+    {
       return true;
     }
   }
@@ -81,58 +72,58 @@ bool xboxConnCheck() {
 #endif
 }
 
-void updateMotors(int XSpeed, int YSpeed, int TSpeed) {
+void updateMotors(int XSpeed, int YSpeed, int TSpeed)
+{
+  if (mode1)
+  {
+    front_wheel = constrain(XSpeed - TSpeed, -100, 100);
+    right_wheel = constrain(-YSpeed + TSpeed, -100, 100);
+    back_wheel = constrain(XSpeed + TSpeed, -100, 100);
+    left_wheel = constrain(-YSpeed - TSpeed, -100, 100);
+  }
+  else
+  {
+    front_wheel = constrain(XSpeed - TSpeed, -100, 100);
+    right_wheel = constrain(-YSpeed + TSpeed, -100, 100);
+    back_wheel = constrain(XSpeed + TSpeed, -100, 100);
+    left_wheel = constrain(-YSpeed - TSpeed, -100, 100);
+  }
 
-  front_wheel = constrain(-YSpeed + TSpeed, -100, 100);
-  right_wheel = constrain(XSpeed + TSpeed, -100, 100);
-  back_wheel = constrain(YSpeed + TSpeed, -100, 100);
-  left_wheel = constrain(-XSpeed + TSpeed, -100, 100);
-
-  motor1motor2.control(front_wheel, right_wheel);
-  motor3motor4.control(back_wheel, left_wheel);
+  motor1motor2.control(front_wheel, back_wheel);
+  motor3motor4.control(right_wheel, left_wheel);
 }
 
-void setServo(Servo servo, bool angle) {
-  servo.write(angle? 180 : 45);
-}
-
-void setPickup(int direction, int speed) {
-  if (direction == 1) {
+void setPickup(int direction, int speed)
+{
+  if (direction == 1)
+  {
     digitalWrite(dir, LOW);
-  } else {
+  }
+  else
+  {
     digitalWrite(dir, HIGH);
   }
   analogWrite(pwm, speed);
 }
 
-
-
-void setup() {
+void setup()
+{
   Wire.begin();
   odrive_serial.begin(115200);
+  servo_serial.begin(9600);
   Serial.begin(115200);
 
-  #if!defined(MIPSEL)
+#if !defined(MIPSEL)
   while (!Serial)
-  ;
-  #endif
-  if (Usb.Init() == -1) {
+    ;
+#endif
+  if (Usb.Init() == -1)
+  {
     Serial.print(F("\r\nOSC did not start"));
     while (1)
-    ;
+      ;
   }
   Serial.print(F("\r\nXbox Wireless Receiver Library Started"));
-
-  // Attach Servos
-  servo1_3.attach(srvPin1_3, 1000, 2500);
-  servo2.attach(srvPin2, 1000, 2500);
-  servo4.attach(srvPin4, 1000, 2500);
-  servo5.attach(srvPin5, 1000, 2500);
-  servo6.attach(srvPin6, 1000, 2500);
-
-  // Set Pneumatic Pins
-  pinMode(leftPneumatic, OUTPUT);
-  pinMode(rightPneumatic, OUTPUT);
 
   // Set Stepper Pins
   pinMode(pwm, OUTPUT);
@@ -140,172 +131,273 @@ void setup() {
 
   // Set Initial Values
   updateMotors(0, 0, 0);
-  setServo(servo1_3, 0);
-  setServo(servo2, 1);
-  setServo(servo4, 1);
-  setServo(servo5, 0);
-  setServo(servo6, 0);
-  digitalWrite(leftPneumatic, LOW);
-  digitalWrite(rightPneumatic, LOW);
+  servo_serial.write("#1P800#2P800#3P800#4P800T100\r\n");
 }
 
-void loop() {
+void loop()
+{
   Usb.Task();
-  if (xboxConnCheck()) {
-    #ifdef XBOX_ALT_MODE
-    int leftHatY = Xbox.getAnalogHat(LeftHatY);
-    int leftHatX = Xbox.getAnalogHat(LeftHatX);
-    int rightHatX = Xbox.getAnalogHat(RightHatX);
-    #else
-    int leftHatY = Xbox.getAnalogHat(LeftHatY, conid);
-    int leftHatX = Xbox.getAnalogHat(LeftHatX, conid);
-    int rightHatX = Xbox.getAnalogHat(RightHatX, conid);
-    #endif
+  if (xboxConnCheck())
+  {
+    if (!Xbox.getButtonPress(LT))
+    {
+#ifdef XBOX_ALT_MODE
+      int leftHatY = Xbox.getAnalogHat(LeftHatY);
+      int leftHatX = Xbox.getAnalogHat(LeftHatX);
+      int rightHatX = Xbox.getAnalogHat(RightHatX);
+#else
+      int leftHatY = Xbox.getAnalogHat(LeftHatY, conid);
+      int leftHatX = Xbox.getAnalogHat(LeftHatX, conid);
+      int rightHatX = Xbox.getAnalogHat(RightHatX, conid);
+#endif
 
-    int XSpeed = 0, YSpeed = 0, TSpeed = 0;
+      int XSpeed = 0, YSpeed = 0, TSpeed = 0;
 
-    // Motor Control
-    if (leftHatX > deadzone) {
-      XSpeed = map(leftHatX, deadzone, 32767, minSpeed, maxSpeed);
-    } else if (leftHatX < -deadzone) {
-      XSpeed = map(leftHatX, -32768, -deadzone, -maxSpeed, -minSpeed);
-    }
-    if (leftHatY > deadzone) {
-      YSpeed = map(leftHatY, deadzone, 32767, minSpeed, maxSpeed);
-    } else if (leftHatY < -deadzone) {
-      YSpeed = map(leftHatY, -32768, -deadzone, -maxSpeed, -minSpeed);
-    }
-    if (rightHatX > deadzone) {
-      TSpeed = map(rightHatX, deadzone, 32767, minSpeed, maxSpeed);
-    } else if (rightHatX < -deadzone) {
-      TSpeed = map(rightHatX, -32768, -deadzone, -maxSpeed, -minSpeed);
-    }
+      // Motor Control
 
-    updateMotors(XSpeed, YSpeed, TSpeed * 0.8);
+      if (!Xbox.getButtonPress(RT))
+      {
+        int minSpeed = 5;
+        int maxSpeed = 50;
 
-    // Servo Control
-    if (Xbox.getButtonClick(LT)) {
-      if (srvState1_3 == 0) {
-        setServo(servo1_3, 1);
-        srvState1_3 = 1;
-      } else {
-        setServo(servo1_3, 0);
-        srvState1_3 = 0;
+        if (leftHatX > deadzone)
+        {
+          XSpeed = map(leftHatX, deadzone, 32767, minSpeed, maxSpeed);
+        }
+        else if (leftHatX < -deadzone)
+        {
+          XSpeed = map(leftHatX, -32768, -deadzone, -maxSpeed, -minSpeed);
+        }
+        if (leftHatY > deadzone)
+        {
+          YSpeed = map(leftHatY, deadzone, 32767, minSpeed, maxSpeed);
+        }
+        else if (leftHatY < -deadzone)
+        {
+          YSpeed = map(leftHatY, -32768, -deadzone, -maxSpeed, -minSpeed);
+        }
+        if (rightHatX > deadzone)
+        {
+          TSpeed = map(rightHatX, deadzone, 32767, minSpeed, maxSpeed);
+        }
+        else if (rightHatX < -deadzone)
+        {
+          TSpeed = map(rightHatX, -32768, -deadzone, -maxSpeed, -minSpeed);
+        }
       }
-    }
-    if (Xbox.getButtonClick(LB)) {
-      if (srvState2 == 0) {
-        setServo(servo2, 0);
-        srvState2 = 1;
-      } else {
-        setServo(servo2, 1);
-        srvState2 = 0;
+      else
+      {
+        int minSpeed = 5;
+        int maxSpeed = 15;
+
+        if (leftHatX > deadzone)
+        {
+          XSpeed = map(leftHatX, deadzone, 32767, minSpeed, maxSpeed);
+        }
+        else if (leftHatX < -deadzone)
+        {
+          XSpeed = map(leftHatX, -32768, -deadzone, -maxSpeed, -minSpeed);
+        }
+        if (leftHatY > deadzone)
+        {
+          YSpeed = map(leftHatY, deadzone, 32767, minSpeed, maxSpeed);
+        }
+        else if (leftHatY < -deadzone)
+        {
+          YSpeed = map(leftHatY, -32768, -deadzone, -maxSpeed, -minSpeed);
+        }
+        if (rightHatX > deadzone)
+        {
+          TSpeed = map(rightHatX, deadzone, 32767, minSpeed, maxSpeed);
+        }
+        else if (rightHatX < -deadzone)
+        {
+          TSpeed = map(rightHatX, -32768, -deadzone, -maxSpeed, -minSpeed);
+        }
       }
-    }
-    if (Xbox.getButtonClick(RT)) {
-      if (srvState4_5 == 0) {
-        setServo(servo4, 0);
-        setServo(servo5, 1);
-        srvState4_5 = 1;
-      } else {
-        setServo(servo4, 1);
-        setServo(servo5, 0);
-        srvState4_5 = 0;
+      updateMotors(-XSpeed, -YSpeed, TSpeed);
+
+      if (Xbox.getButtonClick(START))
+      {
+        mode1 = false;
+        mode2 = true;
       }
-    }
-    if (Xbox.getButtonClick(RB)) {
-      if (srvState6 == 0) {
-        setServo(servo6, 1);
-        srvState6 = 1;
-      } else {
-        setServo(servo6, 0);
-        srvState6 = 0;
+      if (Xbox.getButtonClick(BACK))
+      {
+        mode1 = true;
+        mode2 = false;
       }
-    }
 
-    // Pneumatic Control
-    if (Xbox.getButtonClick(BACK)) {
-      digitalWrite(leftPneumatic, pneumLeft ? LOW : HIGH);
-      pneumLeft = !pneumLeft;
-    }
-    if (Xbox.getButtonClick(START)) {
-      digitalWrite(rightPneumatic, pneumRight ? LOW : HIGH);
-      pneumRight = !pneumRight;
-    }
+      if (mode1) // Seedling Mode
+      {
+        // Servo Control
+        if (Xbox.getButtonClick(LB))
+        {
+          if (srv_1_2 == 0)
+          {
+            servo_serial.write("#1P500#2P500T100\r\n");
+            srv_1_2 = 1;
+          }
+          else
+          {
+            servo_serial.write("#1P2500#2P2500T100\r\n");
+            srv_1_2 = 0;
+          }
+        }
+        if (Xbox.getButtonClick(RB))
+        {
+          if (srv_3_4 == 0)
+          {
+            servo_serial.write("#3P500#4P500T100\r\n");
+            srv_3_4 = 1;
+          }
+          else
+          {
+            servo_serial.write("#3P500#4P2500T100\r\n");
+            srv_3_4 = 0;
+          }
+        }
 
-    // Calibrate ODrives
-    if (Xbox.getButtonClick(A)) {
-      for (int i = 0; i <= 1; i++) {
-        requested_state = AXIS_STATE_MOTOR_CALIBRATION;
-        if (!odrive.run_state(i, requested_state, true)) return;
+        // Linear Actuator
+        if (Xbox.getButtonPress(Y))
+        {
+          linearLeft.setSpeed(-255);
+        }
+        else if (Xbox.getButtonPress(A))
+        {
+          linearLeft.setSpeed(255);
+        }
+        else
+        {
+          linearLeft.setSpeed(0);
+        }
 
-        requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-        if (!odrive.run_state(i, requested_state, true, 25.0f)) return;
-
-        requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
-        if (!odrive.run_state(i, requested_state, false)) return;
+        if (Xbox.getButtonPress(UP))
+        {
+          linearRight.setSpeed(-255);
+        }
+        else if (Xbox.getButtonPress(DOWN))
+        {
+          linearRight.setSpeed(255);
+        }
+        else
+        {
+          linearRight.setSpeed(0);
+        }
       }
-    }
+      else // Ball Throwing Mode
+      {
+        // Ball Pickup Control
+        if (Xbox.getButtonClick(UP))
+        {
+          if (bp_state)
+          {
+            setPickup(1, 140);
+            delay(150);
+            setPickup(1, 0);
+            bp_state = 0;
+          }
+          else
+          {
+            setPickup(0, 140);
+            bp_state = 1;
+          }
+        }
+        if (Xbox.getButtonClick(DOWN))
+        {
+          setPickup(1, 140);
+          delay(150);
+          setPickup(1, 0);
+          bp_state = 0;
+        }
 
-    // Set ODrive Velocities
-    if (Xbox.getButtonClick(Y)) {
-      odrive.SetVelocity(0, odrv ? 0 : 35);
-      odrive.SetVelocity(1, odrv ? 0 : 30);
-      odrv = !odrv;
-    }
+        // Calibrate ODrives
+        if (Xbox.getButtonClick(A))
+        {
+          updateMotors(0, 0, 0);
+          linearLeft.setSpeed(0);
+          linearRight.setSpeed(0);
+          setPickup(0, 0);
+          bp_state = 0;
+          for (int i = 0; i <= 1; i++)
+          {
+            requested_state = AXIS_STATE_MOTOR_CALIBRATION;
+            if (!odrive.run_state(i, requested_state, true))
+              return;
 
-    // Ball Pickup Control
-    if (Xbox.getButtonClick(UP)) {
-      if (pickupState == 0) {
-        setPickup(1, 250);
-        pickupState = 1;
-      } else {
-        setPickup(0, 255);
-        delay(500); // TODO - Asynchronous
-        setPickup(0, 0);
-        pickupState = 0;
+            requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
+            if (!odrive.run_state(i, requested_state, true, 25.0f))
+              return;
+
+            requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
+            if (!odrive.run_state(i, requested_state, false))
+              return;
+          }
+        }
+
+        // Set ODrive Velocities
+        if (Xbox.getButtonClick(Y))
+        {
+          odrive.SetVelocity(0, odrv ? 0 : 30);
+          odrive.SetVelocity(1, odrv ? 0 : 25);
+          odrv = !odrv;
+        }
+
+        if (Xbox.getButtonClick(B))
+        {
+          odrive.SetVelocity(0, odrv ? 0 : 35);
+          odrive.SetVelocity(1, odrv ? 0 : 30);
+          odrv = !odrv;
+        }
       }
+
+      // Motor Debugging
+      Serial.print("Motors - 1: ");
+      Serial.print(front_wheel);
+      Serial.print("  2: ");
+      Serial.print(right_wheel);
+      Serial.print("  3: ");
+      Serial.print(back_wheel);
+      Serial.print("  4: ");
+      Serial.print(left_wheel);
+
+      // Servo Debugging
+      Serial.print("  Servos - 1_2: ");
+      Serial.print(srv_1_2);
+      Serial.print("  Servos - 3_4: ");
+      Serial.print(srv_3_4);
+
+      // ODrive Debugging
+      Serial.print("  ODrives: ");
+      Serial.print(odrv);
+
+      // Ball Pickup Debugging
+      Serial.print("  Pickup State: ");
+      Serial.println(pickupState);
     }
-
-
-
-    // Motor Debugging
-    Serial.print("Motors - 1: ");
-    Serial.print(front_wheel);
-    Serial.print("  2: ");
-    Serial.print(right_wheel);
-    Serial.print("  3: ");
-    Serial.print(back_wheel);
-    Serial.print("  4: ");
-    Serial.print(left_wheel);
-
-    // Servo Debugging
-    Serial.print("  Servos - 1_3: ");
-    Serial.print(servo1_3.read());
-    Serial.print("  2: ");
-    Serial.print(servo2.read());
-    Serial.print("  4: ");
-    Serial.print(servo4.read());
-    Serial.print("  5: ");
-    Serial.print(servo5.read());
-    Serial.print("  6: ");
-    Serial.print(servo6.read());
-
-    // Pneumatic Debugging
-    Serial.print("  Pneumatics - Left: ");
-    Serial.print(pneumLeft);
-    Serial.print("  Right: ");
-    Serial.print(pneumRight);
-
-    // ODrive Debugging
-    Serial.print("  ODrives: ");
-    Serial.print(odrv);
-
-    // Ball Pickup Debugging
-    Serial.print("  Pickup State: ");
-    Serial.println(pickupState);
-  } else {
+    else
+    {
+      updateMotors(0, 0, 0);
+      linearLeft.setSpeed(0);
+      linearRight.setSpeed(0);
+      setPickup(0, 0);
+      bp_state = 0;
+      odrive.SetVelocity(0, 0);
+      odrive.SetVelocity(1, 0);
+      odrv = false;
+      Serial.println("Kill Switch Activated!");
+    }
+  }
+  else
+  {
     updateMotors(0, 0, 0);
+    linearLeft.setSpeed(0);
+    linearRight.setSpeed(0);
+    setPickup(0, 0);
+    bp_state = 0;
+    odrive.SetVelocity(0, 0);
+    odrive.SetVelocity(1, 0);
+    odrv = false;
+    Serial.println("Controller Disconnected!");
   }
 }
-  
