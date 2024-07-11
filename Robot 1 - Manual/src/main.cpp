@@ -131,7 +131,7 @@ void setup()
 
   // Set Initial Values
   updateMotors(0, 0, 0);
-  servo_serial.write("#1P800#2P800#3P800#4P800T100\r\n");
+  servo_serial.write("#1P1625#2P1850#3P1850#4P1875T100\r\n");
 }
 
 void loop()
@@ -235,12 +235,12 @@ void loop()
         {
           if (srv_1_2 == 0)
           {
-            servo_serial.write("#1P500#2P500T100\r\n");
+            servo_serial.write("#1P2000#2P2250T100\r\n");
             srv_1_2 = 1;
           }
           else
           {
-            servo_serial.write("#1P2500#2P2500T100\r\n");
+            servo_serial.write("#1P1250#2P1450T100\r\n");
             srv_1_2 = 0;
           }
         }
@@ -248,12 +248,12 @@ void loop()
         {
           if (srv_3_4 == 0)
           {
-            servo_serial.write("#3P500#4P500T100\r\n");
+            servo_serial.write("#3P1400#4P1500T100\r\n");
             srv_3_4 = 1;
           }
           else
           {
-            servo_serial.write("#3P500#4P2500T100\r\n");
+            servo_serial.write("#3P2300#4P2250T100\r\n");
             srv_3_4 = 0;
           }
         }
