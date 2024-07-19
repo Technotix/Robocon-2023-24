@@ -1,8 +1,7 @@
-#include <Arduino.h>
-
 // Add Comment to Disable Alternate XBOX Receiver Mode
 #define XBOX_ALT_MODE
 
+#include <Arduino.h>
 #include <Cytron_SmartDriveDuo.h>
 #include <Servo.h>
 #include <HardwareSerial.h>
@@ -18,6 +17,7 @@
 #include <XBOXRECV.h>
 #endif
 
+
 // Define XBOX Controller Buttons and Speed Parameters
 #define conid 0
 #define deadzone 0
@@ -26,12 +26,20 @@
 #define mdds_1_2 23
 #define mdds_3_4 25
 
-CytronMD linearLeft(PWM_DIR, 5, 49);
-CytronMD linearRight(PWM_DIR, 4, 53);
-
 // Define Ball Pickup Pins
 #define pwm 2
 #define dir 27
+
+// Define laser pins
+#define l1 30
+#define l2 3
+
+// Define Linear Actuator Pins
+#define ll_pwm 5
+#define lr_pwm 4
+#define ll_dir 49
+#define lr_dir 53
+
 
 // Define All Objects
 HardwareSerial &odrive_serial = Serial3;
@@ -42,6 +50,9 @@ HardwareSerial &servo_serial = Serial2;
 Cytron_SmartDriveDuo motor1motor2(SERIAL_SIMPLIFIED, mdds_1_2, 115200);
 Cytron_SmartDriveDuo motor3motor4(SERIAL_SIMPLIFIED, mdds_3_4, 115200);
 
+CytronMD linearLeft(PWM_DIR, ll_pwm, ll_dir);
+CytronMD linearRight(PWM_DIR, lr_pwm, lr_dir);
+
 USB Usb;
 #ifdef XBOX_ALT_MODE
 XBOXUSB Xbox(&Usb);
@@ -49,9 +60,12 @@ XBOXUSB Xbox(&Usb);
 XBOXRECV Xbox(&Usb);
 #endif
 
+// Define Variables
 int front_wheel = 0, right_wheel = 0, back_wheel = 0, left_wheel = 0, requested_state = 0, motornum = 0, pickupState = 0, srvState1_2 = 1, srvState3_4 = 1, bp_state = 0, srv_1_2 = 0, srv_3_4 = 0;
-bool odrv = false, mode1 = true, mode2 = false;
+bool odrv = false, mode1 = true, mode2 = false, lu = false, ld = false, ru = false, rd = false;
+double long ts = 0;
 
+// Function Definitions
 bool xboxConnCheck()
 {
 #ifdef XBOX_ALT_MODE
@@ -76,10 +90,10 @@ void updateMotors(int XSpeed, int YSpeed, int TSpeed)
 {
   if (mode1)
   {
-    front_wheel = constrain(XSpeed - TSpeed, -100, 100);
-    right_wheel = constrain(-YSpeed + TSpeed, -100, 100);
-    back_wheel = constrain(XSpeed + TSpeed, -100, 100);
-    left_wheel = constrain(-YSpeed - TSpeed, -100, 100);
+    front_wheel = constrain(-XSpeed - TSpeed, -100, 100);
+    right_wheel = constrain(YSpeed + TSpeed, -100, 100);
+    back_wheel = constrain(-XSpeed + TSpeed, -100, 100);
+    left_wheel = constrain(YSpeed - TSpeed, -100, 100);
   }
   else
   {
@@ -106,6 +120,8 @@ void setPickup(int direction, int speed)
   analogWrite(pwm, speed);
 }
 
+
+// Setup Function
 void setup()
 {
   Wire.begin();
@@ -125,15 +141,23 @@ void setup()
   }
   Serial.print(F("\r\nXbox Wireless Receiver Library Started"));
 
-  // Set Stepper Pins
+  // Initialize Motors and laser
   pinMode(pwm, OUTPUT);
   pinMode(dir, OUTPUT);
 
-  // Set Initial Values
+  pinMode(l1, OUTPUT);
+  pinMode(l2, OUTPUT);
+
+  digitalWrite(l1, HIGH);
+  digitalWrite(l2, HIGH);
+
+  // Set Servo Positions and stop motors
   updateMotors(0, 0, 0);
-  servo_serial.write("#1P1625#2P1850#3P1850#4P1875T100\r\n");
+  servo_serial.write("#1P1625#2P1550#3P1850#4P1875T100\r\n");
 }
 
+
+// Main Loop
 void loop()
 {
   Usb.Task();
@@ -231,20 +255,20 @@ void loop()
       if (mode1) // Seedling Mode
       {
         // Servo Control
-        if (Xbox.getButtonClick(LB))
+        if (Xbox.getButtonClick(RB))
         {
           if (srv_1_2 == 0)
           {
-            servo_serial.write("#1P2000#2P2250T100\r\n");
+            servo_serial.write("#1P2000#2P1800T100\r\n");
             srv_1_2 = 1;
           }
           else
           {
-            servo_serial.write("#1P1250#2P1450T100\r\n");
+            servo_serial.write("#1P1185#2P1225T100\r\n");
             srv_1_2 = 0;
           }
         }
-        if (Xbox.getButtonClick(RB))
+        if (Xbox.getButtonClick(LB))
         {
           if (srv_3_4 == 0)
           {
@@ -253,17 +277,17 @@ void loop()
           }
           else
           {
-            servo_serial.write("#3P2300#4P2250T100\r\n");
+            servo_serial.write("#3P2350#4P2400T100\r\n");
             srv_3_4 = 0;
           }
         }
 
         // Linear Actuator
-        if (Xbox.getButtonPress(Y))
+        if (Xbox.getButtonPress(UP))
         {
           linearLeft.setSpeed(-255);
         }
-        else if (Xbox.getButtonPress(A))
+        else if (Xbox.getButtonPress(DOWN))
         {
           linearLeft.setSpeed(255);
         }
@@ -272,11 +296,11 @@ void loop()
           linearLeft.setSpeed(0);
         }
 
-        if (Xbox.getButtonPress(UP))
+        if (Xbox.getButtonPress(Y))
         {
           linearRight.setSpeed(-255);
         }
-        else if (Xbox.getButtonPress(DOWN))
+        else if (Xbox.getButtonPress(A))
         {
           linearRight.setSpeed(255);
         }
