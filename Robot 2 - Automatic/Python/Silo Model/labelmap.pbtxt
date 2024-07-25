@@ -1,0 +1,15 @@
+item {
+  id: 1
+  name: 'silo-0'
+}
+
+item {
+  id: 2
+  name: 'silo-1'
+}
+
+item {
+  id: 3
+  name: 'silo-2'
+}
+
